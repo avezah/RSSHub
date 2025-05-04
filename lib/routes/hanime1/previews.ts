@@ -4,12 +4,12 @@ import { config } from '@/config';
 import { load } from 'cheerio';
 
 export const route: Route = {
-    path: '/previews/:date',
-    name: '新番预告',
+    path: '/previews/:date?',
+    name: '每月新番',
     maintainers: ['kjasn'],
     example: '/hanime1/previews/202504',
     categories: ['anime'],
-    parameters: { date: { description: 'Date in YYYYMM format' } },
+    parameters: { date: { description: '日期格式为 `YYYYMM`，默认值当月' } },
     features: {
         requireConfig: false,
         requirePuppeteer: false,
@@ -20,13 +20,21 @@ export const route: Route = {
     },
     radar: [
         {
-            source: ['hanime1.me/previews/:date'],
+            source: ['hanime1.me/previews/:date', 'hanime1.me/previews'],
             target: '/previews/:date',
         },
     ],
     handler: async (ctx) => {
         const baseUrl = 'https://hanime1.me';
-        const { date } = ctx.req.param();
+        let { date } = ctx.req.param();
+        if (!date) {
+            // 默认使用当前日期
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            date = `${year}${month >= 10 ? month : '0' + month}`;
+        }
+
         const link = `${baseUrl}/previews/${date}`;
 
         const response = await ofetch(link, {
@@ -50,9 +58,9 @@ export const route: Route = {
 
                 // 发布时间 MMDD
                 const rawDate = row.find('.preview-info-cover div').text().trim();
-                // 链接
+                // 视频 选中模态框全局查找
                 const modalSelector = row.find('.trailer-modal-trigger').attr('data-target') || '';
-                const previewVideoLink = modalSelector ? $(modalSelector).find('video source').attr('src') || '' : '';
+                const previewVideoLink = modalSelector ? $(`${modalSelector} video source`).attr('src') || '' : '';
 
                 // 简介
                 const description = row.find('.caption').first().text().trim();
@@ -68,8 +76,11 @@ export const route: Route = {
                     description: `
                     <p>${description} </p>
                     <p>Tags: [${tags.join(', ')}]</p>
+                    <video controls width="100%" poster="${previewImageSrc}">
+                        <source src="${previewVideoLink}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
                     `,
-                    // image: previewImageSrc,
                     enclosure_url: previewImageSrc,
                     enclosure_type: 'image/jpeg',
                     link: previewVideoLink,
@@ -78,7 +89,7 @@ export const route: Route = {
             });
 
         return {
-            title: `Hanime1 ${date}新番预告`,
+            title: `Hanime1 ${date} 新番`,
             link,
             item: items,
         };
