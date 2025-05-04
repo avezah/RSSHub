@@ -45,6 +45,16 @@ kill_timeout = '5s'
     timeout = '2s'
     grace_period = '1s'
 
+[checks]
+  [checks.custom_check]
+    grace_period = "30s"
+    interval = "30s"
+    method = "get"
+    path = "/healthz"
+    port = 1200
+    timeout = "10s"
+    type = "http"
+
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
